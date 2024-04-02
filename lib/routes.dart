@@ -7,7 +7,7 @@ class Routes {
   final BuildContext context;
 
   final Map<String, Widget Function(BuildContext)> routes = {
-    Routes.home: (context) => const HomePage(title: 'SOUNDBOARD (100% REAL NO FAKE)'),
+    Routes.home: (context) => HomePage(title: 'SOUNDBOARD (100% REAL NO FAKE)'),
     Routes.settings: (context) => const SettingsPage(),
   };
 
