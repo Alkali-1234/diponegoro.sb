@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -102,6 +104,17 @@ class AdeganList extends Notifier<List<Adegan>> {
     state = state.map((e) => e == state[index] ? adegan : e).toList();
   }
 
+  void reorderAdegan(int oldIndex, int newIndex) {
+    List<Adegan> adeganList = state;
+    Adegan adegan = adeganList.removeAt(oldIndex);
+    if (newIndex != adeganList.length) {
+      adeganList.insert(newIndex, adegan);
+    } else {
+      adeganList.add(adegan);
+    }
+    state = adeganList;
+  }
+
   List<Adegan> get adeganList => state;
 
   @override
@@ -181,12 +194,18 @@ class HomePage extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16.0),
                         Expanded(
-                          child: ListView.builder(
+                          child: ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
+                            onReorder: (oldIndex, newIndex) {
+                              if (newIndex > adeganList.length) return;
+                              adeganListNotifier.reorderAdegan(oldIndex, newIndex > oldIndex ? newIndex - 1 : newIndex);
+                            },
                             itemCount: adeganList.length + 1,
                             itemBuilder: (context, adeganIndex) {
                               Adegan adegan = adeganList.isEmpty || adeganIndex == adeganList.length ? Adegan(title: "", sounds: []) : adeganList[adeganIndex];
                               return adeganIndex != adeganList.length && adeganList.isNotEmpty
                                   ? Container(
+                                      key: ValueKey("adegan${adeganIndex}_${adegan.title}"),
                                       margin: const EdgeInsets.only(top: 16.0),
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
@@ -201,6 +220,16 @@ class HomePage extends ConsumerWidget {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
+                                              ReorderableDragStartListener(
+                                                  index: adeganIndex,
+                                                  child: MouseRegion(
+                                                    cursor: SystemMouseCursors.grab,
+                                                    child: Icon(
+                                                      Icons.drag_indicator,
+                                                      color: theme.colorScheme.onBackground,
+                                                    ),
+                                                  )),
+                                              const SizedBox(width: 8.0),
                                               Expanded(
                                                   child: TapRegion(
                                                 onTapInside: (event) {
@@ -258,6 +287,7 @@ class HomePage extends ConsumerWidget {
                                               borderRadius: BorderRadius.circular(8.0),
                                             ),
                                             child: ListView.builder(
+                                              physics: const NeverScrollableScrollPhysics(),
                                               shrinkWrap: true,
                                               itemCount: adegan.sounds.length + 1,
                                               itemBuilder: (context, index) {
@@ -302,8 +332,22 @@ class HomePage extends ConsumerWidget {
                                                               const SizedBox(width: 8.0),
                                                               IconButton(
                                                                 onPressed: () async {
+                                                                  if (sound.path.isEmpty) {
+                                                                    showDialog(
+                                                                        context: context,
+                                                                        builder: (context) => AlertDialog(
+                                                                                title: Text(
+                                                                                  "Error",
+                                                                                  style: textTheme.displayMedium,
+                                                                                ),
+                                                                                content: Text("Sound path is empty", style: textTheme.displaySmall),
+                                                                                actions: [
+                                                                                  TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
+                                                                                ]));
+                                                                    return;
+                                                                  }
                                                                   await audioPlayerKey.currentState!.setAsset(sound.path);
-                                                                  audioPlayerKey.currentState!.play(null);
+                                                                  audioPlayerKey.currentState!.play(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
                                                                 },
                                                                 icon: const Icon(Icons.play_arrow, color: Colors.green),
                                                               ),
@@ -317,6 +361,7 @@ class HomePage extends ConsumerWidget {
                                       ),
                                     )
                                   : Padding(
+                                      key: const ValueKey("addButton"),
                                       padding: const EdgeInsets.only(top: 8.0),
                                       child: IconButton(
                                           onPressed: () {
@@ -351,6 +396,14 @@ final selectedFilePathProvider = StateProvider<String?>((ref) {
   return null;
 });
 
+final startingSecondsProvider = StateProvider<int?>((ref) {
+  return null;
+});
+
+final startingVolumeProvider = StateProvider<double?>((ref) {
+  return null;
+});
+
 class SoundSettingsDialog extends ConsumerWidget {
   SoundSettingsDialog({super.key, required this.sound, required this.adeganIndex, required this.soundIndex});
   final Sound sound;
@@ -372,7 +425,7 @@ class SoundSettingsDialog extends ConsumerWidget {
     final selectedFilePath = ref.read(selectedFilePathProvider);
     File? newSoundFile;
     if (selectedFilePath != null) {
-      File(oldSound.path).delete();
+      if (File(oldSound.path).existsSync()) File(oldSound.path).delete();
       final appDocumentsDir = await getApplicationDocumentsDirectory();
       //* Create directory
       Directory soundDir = await Directory("${appDocumentsDir.path}/adegan$adeganIndex/sound$soundIndex").create(recursive: true);
@@ -384,7 +437,7 @@ class SoundSettingsDialog extends ConsumerWidget {
     //* Update adegan
     final adeganList = ref.read(adeganListProvider);
     Adegan adegan = adeganList[adeganIndex];
-    adegan.sounds[soundIndex] = Sound(title: sound.title, path: newSoundFile?.path ?? sound.path);
+    adegan.sounds[soundIndex] = Sound(title: sound.title, path: newSoundFile?.path ?? sound.path, startingSeconds: ref.read(startingSecondsProvider), startingVolume: ref.read(startingVolumeProvider));
     final adeganListNotifier = ref.read(adeganListProvider.notifier);
     adeganListNotifier.updateAdegan(adegan, adeganIndex);
     ref.read(selectedFilePathProvider.notifier).state = null;
@@ -457,6 +510,38 @@ class SoundSettingsDialog extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16.0),
+                //* Starting time
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Column(
+                      children: [
+                        Text("Starting Time", style: textTheme.displaySmall),
+                        const SizedBox(height: 8.0),
+                        StartingTimeSettingsWidget(
+                          onChanged: (value) {
+                            ref.read(startingSecondsProvider.notifier).state = value;
+                          },
+                          initialValue: sound.startingSeconds ?? 0,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8.0),
+                    Column(
+                      children: [
+                        Text("Starting Volume", style: textTheme.displaySmall),
+                        const SizedBox(height: 8.0),
+                        StartingVolumeSettingsWidget(
+                          onChanged: (value) {
+                            ref.read(startingVolumeProvider.notifier).state = value;
+                          },
+                          initialValue: sound.startingVolume ?? 1.0,
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+                const SizedBox(height: 16.0),
                 Row(
                   children: [
                     Expanded(
@@ -509,11 +594,14 @@ class AudioPlayerWidgetState extends State<AudioPlayerWidget> {
     await player.setAsset(path);
   }
 
-  Future<void> play(int? startingMilliseconds) async {
-    await player.play();
-    if (startingMilliseconds != null) {
+  Future<void> play(int startingMilliseconds, double startingVolume) async {
+    setState(() {
+      player.play();
+    });
+    if (startingMilliseconds != 0) {
       player.seek(Duration(milliseconds: startingMilliseconds));
     }
+    player.setVolume(startingVolume);
   }
 
   @override
@@ -523,60 +611,202 @@ class AudioPlayerWidgetState extends State<AudioPlayerWidget> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: theme.secondary, borderRadius: BorderRadius.circular(8.0), border: Border.all(color: theme.secondary)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (player.playing)
-            IconButton(
-                onPressed: () => setState(() {
-                      player.stop();
-                    }),
-                icon: const Icon(Icons.stop, color: Colors.red)),
-          if (!player.playing)
-            IconButton(
-                onPressed: () => setState(() {
-                      player.play();
-                    }),
-                icon: const Icon(Icons.play_arrow, color: Colors.green)),
-          //* Progress bar with volume visualiser
-          Expanded(
-            child: StreamBuilder<Duration?>(
-              stream: player.durationStream,
-              builder: (context, snapshot) {
-                final duration = snapshot.data;
-                return StreamBuilder<Duration>(
-                    stream: player.positionStream,
-                    builder: (context, snapshot) {
-                      var position = snapshot.data;
-                      return (position == null || duration == null || player.audioSource == null)
-                          ? Slider(
-                              thumbColor: theme.onBackground,
-                              activeColor: Colors.blue,
-                              inactiveColor: Colors.grey,
-                              value: 0,
-                              onChanged: (value) {},
-                              min: 0,
-                              max: 0,
-                            )
-                          : Slider(
-                              value: position.inMilliseconds.toDouble(),
-                              onChanged: (value) {
-                                player.seek(Duration(milliseconds: value.toInt()));
-                              },
-                              min: 0,
-                              max: duration.inMilliseconds.toDouble(),
-                            );
-                    });
-              },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (player.playing)
+                IconButton(
+                    onPressed: () => setState(() {
+                          player.stop();
+                        }),
+                    icon: const Icon(Icons.stop, color: Colors.red)),
+              if (!player.playing)
+                IconButton(
+                    onPressed: () => setState(() {
+                          player.play();
+                        }),
+                    icon: const Icon(Icons.play_arrow, color: Colors.green)),
+              //* Progress bar with volume visualiser
+              Expanded(
+                child: StreamBuilder<Duration?>(
+                  stream: player.durationStream,
+                  builder: (context, snapshot) {
+                    final duration = snapshot.data;
+                    return StreamBuilder<Duration>(
+                        stream: player.positionStream,
+                        builder: (context, snapshot) {
+                          var position = snapshot.data;
+                          return (position == null || duration == null || player.audioSource == null)
+                              ? Slider(
+                                  thumbColor: theme.onBackground,
+                                  activeColor: Colors.blue,
+                                  secondaryActiveColor: Colors.blue,
+                                  overlayColor: MaterialStateColor.resolveWith((states) => Colors.blue),
+                                  inactiveColor: Colors.grey,
+                                  value: 0,
+                                  onChanged: (value) {},
+                                  min: 0,
+                                  max: 0,
+                                )
+                              : Slider(
+                                  thumbColor: theme.onBackground,
+                                  activeColor: Colors.blue,
+                                  secondaryActiveColor: Colors.blue,
+                                  overlayColor: MaterialStateColor.resolveWith((states) => Colors.blue),
+                                  inactiveColor: Colors.grey,
+                                  value: duration.inMilliseconds != 0 ? position.inMilliseconds.toDouble() : 0,
+                                  onChanged: (value) {
+                                    player.seek(Duration(milliseconds: value.toInt()));
+                                  },
+                                  min: 0,
+                                  max: duration.inMilliseconds.toDouble(),
+                                );
+                        });
+                  },
+                ),
+              ),
+              //* Time display
+              StreamBuilder<Duration>(
+                  stream: player.positionStream,
+                  builder: (context, snapshot) {
+                    final position = snapshot.data;
+                    return Text(position != null ? "${position.inMinutes}:${position.inSeconds % 60}" : "nil", style: textTheme.displaySmall);
+                  }),
+            ],
+          ),
+          const SizedBox(height: 16.0),
+          Row(
+            children: [
+              //* VOLUME
+              IconButton(onPressed: null, icon: Icon(Icons.volume_up, color: theme.onBackground)),
+              Expanded(child: StreamBuilder(stream: player.volumeStream, builder: (context, snapshot) => Slider(min: 0, max: 1, thumbColor: theme.onBackground, activeColor: Colors.blue, secondaryActiveColor: Colors.blue, inactiveColor: theme.primary, value: snapshot.data ?? 0, onChanged: (value) => player.setVolume(value)))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+//* Starting Time Settings
+class StartingTimeSettingsWidget extends StatefulWidget {
+  const StartingTimeSettingsWidget({super.key, required this.onChanged, required this.initialValue});
+  final Function(int) onChanged;
+  final int initialValue;
+
+  @override
+  State<StartingTimeSettingsWidget> createState() => _StartingTimeSettingsWidgetState();
+}
+
+class _StartingTimeSettingsWidgetState extends State<StartingTimeSettingsWidget> {
+  late final hourController = TextEditingController(text: (widget.initialValue ~/ 3600).toString());
+  late final minuteController = TextEditingController(text: ((widget.initialValue % 3600) ~/ 60).toString());
+  late final secondController = TextEditingController(text: (widget.initialValue % 60).toString());
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IntrinsicWidth(
+          child: TextField(
+            //* Only allow numbers
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly
+            ],
+            controller: hourController,
+            onChanged: (value) {
+              widget.onChanged(int.parse(value) * 3600 + int.parse(minuteController.text) * 60 + int.parse(secondController.text));
+            },
+            cursorColor: Theme.of(context).colorScheme.onBackground,
+            style: Theme.of(context).textTheme.displaySmall,
+            decoration: InputDecoration(
+              labelText: "H",
+              labelStyle: Theme.of(context).textTheme.displaySmall,
+              fillColor: Theme.of(context).colorScheme.primary,
+              filled: true,
+              border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8.0)),
             ),
           ),
-          //* Time display
-          StreamBuilder<Duration>(
-              stream: player.positionStream,
-              builder: (context, snapshot) {
-                final position = snapshot.data;
-                return Text(position != null ? "${position.inMinutes}:${position.inSeconds % 60}" : "nil", style: textTheme.displaySmall);
-              }),
+        ),
+        Text(" : ", style: Theme.of(context).textTheme.displaySmall),
+        IntrinsicWidth(
+          child: TextField(
+            //* Only allow numbers
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly
+            ],
+            controller: minuteController,
+            onChanged: (value) {
+              widget.onChanged(int.parse(hourController.text) * 3600 + int.parse(value) * 60 + int.parse(secondController.text));
+            },
+            cursorColor: Theme.of(context).colorScheme.onBackground,
+            style: Theme.of(context).textTheme.displaySmall,
+            decoration: InputDecoration(
+              labelText: "M",
+              labelStyle: Theme.of(context).textTheme.displaySmall,
+              fillColor: Theme.of(context).colorScheme.primary,
+              filled: true,
+              border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8.0)),
+            ),
+          ),
+        ),
+        Text(" : ", style: Theme.of(context).textTheme.displaySmall),
+        IntrinsicWidth(
+          child: TextField(
+            //* Only allow numbers
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly
+            ],
+            controller: secondController,
+            onChanged: (value) {
+              widget.onChanged(int.parse(hourController.text) * 3600 + int.parse(minuteController.text) * 60 + int.parse(value));
+            },
+            cursorColor: Theme.of(context).colorScheme.onBackground,
+            style: Theme.of(context).textTheme.displaySmall,
+            decoration: InputDecoration(
+              labelText: "S",
+              labelStyle: Theme.of(context).textTheme.displaySmall,
+              fillColor: Theme.of(context).colorScheme.primary,
+              filled: true,
+              border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8.0)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+//* Starting Volume Settings
+class StartingVolumeSettingsWidget extends StatefulWidget {
+  const StartingVolumeSettingsWidget({super.key, required this.onChanged, required this.initialValue});
+  final Function(double) onChanged;
+  final double initialValue;
+
+  @override
+  State<StartingVolumeSettingsWidget> createState() => _StartingVolumeSettingsWidgetState();
+}
+
+class _StartingVolumeSettingsWidgetState extends State<StartingVolumeSettingsWidget> {
+  late double value = widget.initialValue;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondary,
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: Theme.of(context).colorScheme.secondary),
+      ),
+      child: Row(
+        children: [
+          Slider(value: value, onChanged: (v) => setState(() => value = v), onChangeEnd: (value) => widget.onChanged(value), min: 0, max: 1, thumbColor: Theme.of(context).colorScheme.onBackground, activeColor: Colors.blue, secondaryActiveColor: Colors.blue, inactiveColor: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8.0),
+          Text("${(value * 100).toStringAsFixed(0)}%", style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(width: 20.0),
         ],
       ),
     );

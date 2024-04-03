@@ -11,6 +11,8 @@ class Sound with _$Sound {
   factory Sound({
     required String title,
     required String path,
+    int? startingSeconds,
+    double? startingVolume,
   }) = _Sound;
 
   factory Sound.fromJson(Map<String, Object?> json) => _$SoundFromJson(json);

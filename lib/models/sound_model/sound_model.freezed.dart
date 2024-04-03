@@ -24,6 +24,10 @@ mixin _$Sound {
   set title(String value) => throw _privateConstructorUsedError;
   String get path => throw _privateConstructorUsedError;
   set path(String value) => throw _privateConstructorUsedError;
+  int? get startingSeconds => throw _privateConstructorUsedError;
+  set startingSeconds(int? value) => throw _privateConstructorUsedError;
+  double? get startingVolume => throw _privateConstructorUsedError;
+  set startingVolume(double? value) => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -35,7 +39,11 @@ abstract class $SoundCopyWith<$Res> {
   factory $SoundCopyWith(Sound value, $Res Function(Sound) then) =
       _$SoundCopyWithImpl<$Res, Sound>;
   @useResult
-  $Res call({String title, String path});
+  $Res call(
+      {String title,
+      String path,
+      int? startingSeconds,
+      double? startingVolume});
 }
 
 /// @nodoc
@@ -53,6 +61,8 @@ class _$SoundCopyWithImpl<$Res, $Val extends Sound>
   $Res call({
     Object? title = null,
     Object? path = null,
+    Object? startingSeconds = freezed,
+    Object? startingVolume = freezed,
   }) {
     return _then(_value.copyWith(
       title: null == title
@@ -63,6 +73,14 @@ class _$SoundCopyWithImpl<$Res, $Val extends Sound>
           ? _value.path
           : path // ignore: cast_nullable_to_non_nullable
               as String,
+      startingSeconds: freezed == startingSeconds
+          ? _value.startingSeconds
+          : startingSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
+      startingVolume: freezed == startingVolume
+          ? _value.startingVolume
+          : startingVolume // ignore: cast_nullable_to_non_nullable
+              as double?,
     ) as $Val);
   }
 }
@@ -74,7 +92,11 @@ abstract class _$$SoundImplCopyWith<$Res> implements $SoundCopyWith<$Res> {
       __$$SoundImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String title, String path});
+  $Res call(
+      {String title,
+      String path,
+      int? startingSeconds,
+      double? startingVolume});
 }
 
 /// @nodoc
@@ -90,6 +112,8 @@ class __$$SoundImplCopyWithImpl<$Res>
   $Res call({
     Object? title = null,
     Object? path = null,
+    Object? startingSeconds = freezed,
+    Object? startingVolume = freezed,
   }) {
     return _then(_$SoundImpl(
       title: null == title
@@ -100,6 +124,14 @@ class __$$SoundImplCopyWithImpl<$Res>
           ? _value.path
           : path // ignore: cast_nullable_to_non_nullable
               as String,
+      startingSeconds: freezed == startingSeconds
+          ? _value.startingSeconds
+          : startingSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
+      startingVolume: freezed == startingVolume
+          ? _value.startingVolume
+          : startingVolume // ignore: cast_nullable_to_non_nullable
+              as double?,
     ));
   }
 }
@@ -107,7 +139,11 @@ class __$$SoundImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$SoundImpl with DiagnosticableTreeMixin implements _Sound {
-  _$SoundImpl({required this.title, required this.path});
+  _$SoundImpl(
+      {required this.title,
+      required this.path,
+      this.startingSeconds,
+      this.startingVolume});
 
   factory _$SoundImpl.fromJson(Map<String, dynamic> json) =>
       _$$SoundImplFromJson(json);
@@ -116,10 +152,14 @@ class _$SoundImpl with DiagnosticableTreeMixin implements _Sound {
   String title;
   @override
   String path;
+  @override
+  int? startingSeconds;
+  @override
+  double? startingVolume;
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'Sound(title: $title, path: $path)';
+    return 'Sound(title: $title, path: $path, startingSeconds: $startingSeconds, startingVolume: $startingVolume)';
   }
 
   @override
@@ -128,7 +168,9 @@ class _$SoundImpl with DiagnosticableTreeMixin implements _Sound {
     properties
       ..add(DiagnosticsProperty('type', 'Sound'))
       ..add(DiagnosticsProperty('title', title))
-      ..add(DiagnosticsProperty('path', path));
+      ..add(DiagnosticsProperty('path', path))
+      ..add(DiagnosticsProperty('startingSeconds', startingSeconds))
+      ..add(DiagnosticsProperty('startingVolume', startingVolume));
   }
 
   @JsonKey(ignore: true)
@@ -146,7 +188,11 @@ class _$SoundImpl with DiagnosticableTreeMixin implements _Sound {
 }
 
 abstract class _Sound implements Sound {
-  factory _Sound({required String title, required String path}) = _$SoundImpl;
+  factory _Sound(
+      {required String title,
+      required String path,
+      int? startingSeconds,
+      double? startingVolume}) = _$SoundImpl;
 
   factory _Sound.fromJson(Map<String, dynamic> json) = _$SoundImpl.fromJson;
 
@@ -156,6 +202,12 @@ abstract class _Sound implements Sound {
   @override
   String get path;
   set path(String value);
+  @override
+  int? get startingSeconds;
+  set startingSeconds(int? value);
+  @override
+  double? get startingVolume;
+  set startingVolume(double? value);
   @override
   @JsonKey(ignore: true)
   _$$SoundImplCopyWith<_$SoundImpl> get copyWith =>
