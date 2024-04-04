@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:diponegoro_sb/components/info_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,25 @@ class AdeganFunctions {
     ];
     debugPrint(jsonEncode(adeganListJson));
     return jsonEncode(adeganListJson);
+  }
+
+  static removeAdegan(int index, WidgetRef ref) async {
+    final adeganList = ref.read(adeganListProvider);
+    final adegan = adeganList[index];
+    for (var sound in adegan.sounds) {
+      if (File(sound.path).existsSync()) await File(sound.path).delete();
+    }
+    final adeganListNotifier = ref.read(adeganListProvider.notifier);
+    adeganListNotifier.removeAdegan(adegan);
+  }
+
+  static deleteSound(int adeganIndex, int soundIndex, WidgetRef ref) async {
+    final adeganList = ref.read(adeganListProvider);
+    final adegan = adeganList[adeganIndex];
+    final sound = adegan.sounds[soundIndex];
+    if (File(sound.path).existsSync()) await File(sound.path).delete();
+    final adeganListNotifier = ref.read(adeganListProvider.notifier);
+    adeganListNotifier.updateAdegan(adegan.copyWith(sounds: adegan.sounds.where((element) => element != sound).toList()), adeganIndex);
   }
 }
 
@@ -187,9 +207,9 @@ class HomePage extends ConsumerWidget {
                             ),
                             IconButton(
                                 onPressed: () {
-                                  //TODO : IMPLEMENT SETTINGS
+                                  showDialog(context: context, builder: (context) => const InfoDialog());
                                 },
-                                icon: Icon(Icons.settings, color: theme.colorScheme.onBackground))
+                                icon: Icon(Icons.info, color: theme.colorScheme.onBackground))
                           ],
                         ),
                         const SizedBox(height: 16.0),
@@ -269,9 +289,7 @@ class HomePage extends ConsumerWidget {
                                               )),
                                               const SizedBox(width: 8.0),
                                               GestureDetector(
-                                                onTap: () {
-                                                  adeganListNotifier.removeAdegan(adegan);
-                                                },
+                                                onTap: () => AdeganFunctions.removeAdegan(adeganIndex, ref),
                                                 child: const Icon(
                                                   Icons.delete,
                                                   color: Colors.red,
@@ -323,10 +341,27 @@ class HomePage extends ConsumerWidget {
                                                           trailing: Row(
                                                             mainAxisSize: MainAxisSize.min,
                                                             children: [
-                                                              IconButton(onPressed: () => adeganListNotifier.updateAdegan(adegan.copyWith(sounds: adegan.sounds.where((element) => element != sound).toList()), adeganIndex), icon: const Icon(Icons.delete, color: Colors.red)),
+                                                              IconButton(onPressed: () => AdeganFunctions.deleteSound(adeganIndex, index, ref), icon: const Icon(Icons.delete, color: Colors.red)),
                                                               const SizedBox(width: 8.0),
                                                               IconButton(
-                                                                onPressed: () => debugPrint("fade in"),
+                                                                onPressed: () async {
+                                                                  if (sound.path.isEmpty) {
+                                                                    showDialog(
+                                                                        context: context,
+                                                                        builder: (context) => AlertDialog(
+                                                                                title: Text(
+                                                                                  "Error",
+                                                                                  style: textTheme.displayMedium,
+                                                                                ),
+                                                                                content: Text("Sound path is empty", style: textTheme.displaySmall),
+                                                                                actions: [
+                                                                                  TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
+                                                                                ]));
+                                                                    return;
+                                                                  }
+                                                                  await audioPlayerKey.currentState!.setAsset(sound.path);
+                                                                  audioPlayerKey.currentState!.fadeIn(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
+                                                                },
                                                                 icon: const Icon(Icons.north_east, color: Colors.blue),
                                                               ),
                                                               const SizedBox(width: 8.0),
@@ -594,14 +629,29 @@ class AudioPlayerWidgetState extends State<AudioPlayerWidget> {
     await player.setAsset(path);
   }
 
-  Future<void> play(int startingMilliseconds, double startingVolume) async {
+  Future<void> play(int startingSeconds, double startingVolume) async {
+    await player.seek(Duration(seconds: startingSeconds));
+    await player.setVolume(startingVolume);
     setState(() {
       player.play();
     });
-    if (startingMilliseconds != 0) {
-      player.seek(Duration(milliseconds: startingMilliseconds));
+  }
+
+  Future doFadeIn(double startingVolume) async {
+    if (player.volume < startingVolume - 0.01) {
+      await player.setVolume(player.volume + 0.01);
+      setState(() {});
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (player.playing == false) return;
+      doFadeIn(startingVolume);
     }
-    player.setVolume(startingVolume);
+  }
+
+  Future<void> fadeIn(int startingSeconds, double startingVolume) async {
+    await player.seek(Duration(seconds: startingSeconds));
+    await player.setVolume(0);
+    player.play();
+    doFadeIn(startingVolume);
   }
 
   @override
