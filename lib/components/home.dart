@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:diponegoro_sb/components/info_dialog.dart';
+import 'package:diponegoro_sb/logger.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -26,7 +26,7 @@ class AdeganFunctions {
     List<String> adeganListJson = [
       for (var adegan in adeganList) jsonEncode(adegan.toJson())
     ];
-    debugPrint(jsonEncode(adeganListJson));
+    logger.d(jsonEncode(adeganListJson));
     return jsonEncode(adeganListJson);
   }
 
@@ -55,12 +55,12 @@ class AdeganFunctions {
 class AdeganList extends Notifier<List<Adegan>> {
   Future<void> initialize() async {
     if (ref.read(isInitializedProvider)) return;
-    print("Initializing AdeganList ${ref.read(isInitializedProvider)}");
+    logger.i("Initializing AdeganList ${ref.read(isInitializedProvider)}");
     Directory appDocDir = await getApplicationDocumentsDirectory().then((value) => value);
     //* Create directories
     Directory adeganDir = Directory("${appDocDir.path}/adegan");
     if (!await adeganDir.exists()) {
-      print("Creating adegan directory");
+      logger.i("Creating adegan directory");
       await adeganDir.create();
       //* Create example adegan
       Directory exampleAdegan = Directory("${adeganDir.path}/adegan1/");
@@ -172,6 +172,8 @@ class HomePage extends ConsumerWidget {
 
   final adeganTitleController = TextEditingController();
 
+  final adeganListViewController = ScrollController();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     var theme = Theme.of(context);
@@ -182,8 +184,10 @@ class HomePage extends ConsumerWidget {
     final currentMouseHovering = ref.watch(currentMouseHoveringProvider);
     final currentEditingAdeganTitle = ref.watch(currentEditingAdeganTitleProvider);
 
+    FocusNode focusNode = FocusNode();
+
     ref.listen<List<Adegan>>(adeganListProvider, (previous, adeganList) async {
-      debugPrint("Saving adegan list");
+      logger.i("Saving adegan list");
       SharedPreferences prefs = await SharedPreferences.getInstance();
       prefs.setString("adeganList", AdeganFunctions.exportAdeganListToJson(adeganList));
     });
@@ -199,12 +203,20 @@ class HomePage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            Container(
+                              height: 48,
+                              width: 48,
+                              decoration: const BoxDecoration(
+                                image: DecorationImage(image: AssetImage("assets/d_sb_logo.png"), fit: BoxFit.cover),
+                              ),
+                            ),
+                            const SizedBox(width: 8.0),
                             Text(
                               "diponegoro.sb",
                               style: textTheme.displayMedium!.copyWith(fontWeight: FontWeight.bold),
                             ),
+                            const Spacer(),
                             IconButton(
                                 onPressed: () {
                                   showDialog(context: context, builder: (context) => const InfoDialog());
@@ -214,201 +226,214 @@ class HomePage extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16.0),
                         Expanded(
-                          child: ReorderableListView.builder(
-                            buildDefaultDragHandles: false,
-                            onReorder: (oldIndex, newIndex) {
-                              if (newIndex > adeganList.length) return;
-                              adeganListNotifier.reorderAdegan(oldIndex, newIndex > oldIndex ? newIndex - 1 : newIndex);
-                            },
-                            itemCount: adeganList.length + 1,
-                            itemBuilder: (context, adeganIndex) {
-                              Adegan adegan = adeganList.isEmpty || adeganIndex == adeganList.length ? Adegan(title: "", sounds: []) : adeganList[adeganIndex];
-                              return adeganIndex != adeganList.length && adeganList.isNotEmpty
-                                  ? Container(
-                                      key: ValueKey("adegan${adeganIndex}_${adegan.title}"),
-                                      margin: const EdgeInsets.only(top: 16.0),
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.secondary,
-                                        border: Border.all(color: theme.colorScheme.secondary),
-                                        borderRadius: BorderRadius.circular(8.0),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              ReorderableDragStartListener(
-                                                  index: adeganIndex,
-                                                  child: MouseRegion(
-                                                    cursor: SystemMouseCursors.grab,
-                                                    child: Icon(
-                                                      Icons.drag_indicator,
-                                                      color: theme.colorScheme.onBackground,
-                                                    ),
-                                                  )),
-                                              const SizedBox(width: 8.0),
-                                              Expanded(
-                                                  child: TapRegion(
-                                                onTapInside: (event) {
-                                                  adeganTitleController.text = adegan.title;
-                                                  ref.read(currentEditingAdeganTitleProvider.notifier).state = adeganIndex;
-                                                },
-                                                onTapOutside: (event) {
-                                                  if (currentEditingAdeganTitle != adeganIndex) return;
-                                                  ref.read(currentEditingAdeganTitleProvider.notifier).state = null;
-                                                  adeganListNotifier.updateAdegan(adegan.copyWith(title: adeganTitleController.text), adeganIndex);
-                                                },
+                          child: ListView(
+                            controller: adeganListViewController,
+                            physics: const ClampingScrollPhysics(),
+                            children: [
+                              ReorderableListView.builder(
+                                physics: const NeverScrollableScrollPhysics(),
+                                shrinkWrap: true,
+                                buildDefaultDragHandles: false,
+                                onReorder: (oldIndex, newIndex) {
+                                  if (newIndex > adeganList.length) return;
+                                  adeganListNotifier.reorderAdegan(oldIndex, newIndex > oldIndex ? newIndex - 1 : newIndex);
+                                },
+                                itemCount: adeganList.length,
+                                itemBuilder: (context, adeganIndex) {
+                                  Adegan adegan = adeganList[adeganIndex];
+                                  return Container(
+                                    key: ValueKey("adegan${adeganIndex}_${adegan.title}"),
+                                    margin: const EdgeInsets.only(top: 16.0),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.secondary,
+                                      border: Border.all(color: theme.colorScheme.secondary),
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            ReorderableDragStartListener(
+                                                index: adeganIndex,
                                                 child: MouseRegion(
-                                                    cursor: SystemMouseCursors.text,
-                                                    onEnter: (event) => ref.read(currentMouseHoveringProvider.notifier).state = adeganIndex,
-                                                    onExit: (event) => ref.read(currentMouseHoveringProvider.notifier).state = null,
-                                                    child: currentEditingAdeganTitle != adeganIndex
-                                                        ? AnimatedContainer(
-                                                            duration: const Duration(milliseconds: 200),
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            decoration: BoxDecoration(
-                                                              borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-                                                              border: currentMouseHovering == adeganIndex ? Border.all(color: theme.colorScheme.secondary) : Border.all(color: Colors.transparent),
-                                                            ),
-                                                            child: Text(adegan.title, style: textTheme.displayMedium))
-                                                        : TextField(
-                                                            controller: adeganTitleController,
-                                                            cursorColor: theme.colorScheme.onBackground,
-                                                            style: textTheme.displayMedium,
-                                                            decoration: InputDecoration(
-                                                              labelText: "Title",
-                                                              labelStyle: textTheme.displayMedium,
-                                                              fillColor: theme.colorScheme.primary,
-                                                              filled: true,
-                                                              border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8.0)),
-                                                            ),
-                                                          )),
-                                              )),
-                                              const SizedBox(width: 8.0),
-                                              GestureDetector(
+                                                  cursor: SystemMouseCursors.grab,
+                                                  child: Icon(
+                                                    Icons.drag_indicator,
+                                                    color: theme.colorScheme.onBackground,
+                                                  ),
+                                                )),
+                                            const SizedBox(width: 8.0),
+                                            Expanded(
+                                                child: TapRegion(
+                                              onTapInside: (event) {
+                                                adeganTitleController.text = adegan.title;
+                                                ref.read(currentEditingAdeganTitleProvider.notifier).state = adeganIndex;
+                                                FocusScope.of(context).requestFocus(focusNode);
+                                              },
+                                              onTapOutside: (event) {
+                                                if (currentEditingAdeganTitle != adeganIndex) return;
+                                                ref.read(currentEditingAdeganTitleProvider.notifier).state = null;
+                                                adeganListNotifier.updateAdegan(adegan.copyWith(title: adeganTitleController.text), adeganIndex);
+                                              },
+                                              child: MouseRegion(
+                                                  cursor: SystemMouseCursors.text,
+                                                  onEnter: (event) => ref.read(currentMouseHoveringProvider.notifier).state = adeganIndex,
+                                                  onExit: (event) => ref.read(currentMouseHoveringProvider.notifier).state = null,
+                                                  child: currentEditingAdeganTitle != adeganIndex
+                                                      ? AnimatedContainer(
+                                                          duration: const Duration(milliseconds: 200),
+                                                          padding: const EdgeInsets.all(8.0),
+                                                          decoration: BoxDecoration(
+                                                            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+                                                            border: currentMouseHovering == adeganIndex ? Border.all(color: theme.colorScheme.secondary) : Border.all(color: Colors.transparent),
+                                                          ),
+                                                          child: Text(adegan.title, style: textTheme.displayMedium))
+                                                      : TextField(
+                                                          focusNode: focusNode,
+                                                          controller: adeganTitleController,
+                                                          cursorColor: theme.colorScheme.onBackground,
+                                                          style: textTheme.displayMedium,
+                                                          decoration: InputDecoration(
+                                                            labelText: "Title",
+                                                            labelStyle: textTheme.displayMedium,
+                                                            fillColor: theme.colorScheme.primary,
+                                                            filled: true,
+                                                            border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8.0)),
+                                                          ),
+                                                        )),
+                                            )),
+                                            const SizedBox(width: 8.0),
+                                            MouseRegion(
+                                              cursor: SystemMouseCursors.click,
+                                              child: GestureDetector(
                                                 onTap: () => AdeganFunctions.removeAdegan(adeganIndex, ref),
                                                 child: const Icon(
                                                   Icons.delete,
                                                   color: Colors.red,
                                                 ),
-                                              )
-                                            ],
+                                              ),
+                                            )
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16.0),
+                                        Container(
+                                          padding: const EdgeInsets.all(16.0),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(8.0),
                                           ),
-                                          const SizedBox(height: 16.0),
-                                          Container(
-                                            padding: const EdgeInsets.all(16.0),
-                                            decoration: BoxDecoration(
-                                              color: theme.colorScheme.primary,
-                                              borderRadius: BorderRadius.circular(8.0),
-                                            ),
-                                            child: ListView.builder(
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              shrinkWrap: true,
-                                              itemCount: adegan.sounds.length + 1,
-                                              itemBuilder: (context, index) {
-                                                Sound sound = adegan.sounds.isEmpty || index == adegan.sounds.length ? Sound(title: "", path: "") : adegan.sounds[index];
-                                                return index == adegan.sounds.length || adegan.sounds.isEmpty
-                                                    ? IconButton(
-                                                        onPressed: () {
-                                                          adeganListNotifier.updateAdegan(
-                                                              adegan.copyWith(sounds: [
-                                                                ...adegan.sounds,
-                                                                Sound(title: "Sound ${index + 1}", path: "")
-                                                              ]),
-                                                              adeganIndex);
-                                                        },
-                                                        icon: Icon(
-                                                          Icons.add,
-                                                          color: theme.colorScheme.onBackground,
-                                                        ))
-                                                    : Padding(
-                                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                                        child: ListTile(
-                                                          hoverColor: theme.colorScheme.primaryContainer,
-                                                          onTap: () => showDialog(
-                                                            context: context,
-                                                            builder: (context) => SoundSettingsDialog(
-                                                              sound: sound,
-                                                              adeganIndex: adeganIndex,
-                                                              soundIndex: index,
+                                          child: ListView.builder(
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            shrinkWrap: true,
+                                            itemCount: adegan.sounds.length + 1,
+                                            itemBuilder: (context, index) {
+                                              Sound sound = adegan.sounds.isEmpty || index == adegan.sounds.length ? Sound(title: "", path: "") : adegan.sounds[index];
+                                              return index == adegan.sounds.length || adegan.sounds.isEmpty
+                                                  ? IconButton(
+                                                      onPressed: () {
+                                                        adeganListNotifier.updateAdegan(
+                                                            adegan.copyWith(sounds: [
+                                                              ...adegan.sounds,
+                                                              Sound(title: "Sound ${index + 1}", path: "")
+                                                            ]),
+                                                            adeganIndex);
+                                                      },
+                                                      icon: Icon(
+                                                        Icons.add,
+                                                        color: theme.colorScheme.onBackground,
+                                                      ))
+                                                  : Padding(
+                                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                                      child: ListTile(
+                                                        hoverColor: theme.colorScheme.primaryContainer,
+                                                        onTap: () => showDialog(
+                                                          context: context,
+                                                          builder: (context) => SoundSettingsDialog(
+                                                            sound: sound,
+                                                            adeganIndex: adeganIndex,
+                                                            soundIndex: index,
+                                                          ),
+                                                        ),
+                                                        leading: Icon(Icons.music_note, color: theme.colorScheme.onBackground),
+                                                        title: Text(sound.title, style: textTheme.displaySmall!.copyWith(fontWeight: FontWeight.bold)),
+                                                        trailing: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            IconButton(onPressed: () => AdeganFunctions.deleteSound(adeganIndex, index, ref), icon: const Icon(Icons.delete, color: Colors.red)),
+                                                            const SizedBox(width: 8.0),
+                                                            IconButton(
+                                                              onPressed: () async {
+                                                                if (sound.path.isEmpty) {
+                                                                  showDialog(
+                                                                      context: context,
+                                                                      builder: (context) => AlertDialog(
+                                                                              title: Text(
+                                                                                "Error",
+                                                                                style: textTheme.displayMedium,
+                                                                              ),
+                                                                              content: Text("Sound path is empty", style: textTheme.displaySmall),
+                                                                              actions: [
+                                                                                TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
+                                                                              ]));
+                                                                  return;
+                                                                }
+                                                                await audioPlayerKey.currentState!.setAsset(sound.path);
+                                                                audioPlayerKey.currentState!.fadeIn(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
+                                                              },
+                                                              icon: const Icon(Icons.north_east, color: Colors.blue),
                                                             ),
-                                                          ),
-                                                          leading: Icon(Icons.music_note, color: theme.colorScheme.onBackground),
-                                                          title: Text(sound.title, style: textTheme.displaySmall!.copyWith(fontWeight: FontWeight.bold)),
-                                                          trailing: Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              IconButton(onPressed: () => AdeganFunctions.deleteSound(adeganIndex, index, ref), icon: const Icon(Icons.delete, color: Colors.red)),
-                                                              const SizedBox(width: 8.0),
-                                                              IconButton(
-                                                                onPressed: () async {
-                                                                  if (sound.path.isEmpty) {
-                                                                    showDialog(
-                                                                        context: context,
-                                                                        builder: (context) => AlertDialog(
-                                                                                title: Text(
-                                                                                  "Error",
-                                                                                  style: textTheme.displayMedium,
-                                                                                ),
-                                                                                content: Text("Sound path is empty", style: textTheme.displaySmall),
-                                                                                actions: [
-                                                                                  TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
-                                                                                ]));
-                                                                    return;
-                                                                  }
-                                                                  await audioPlayerKey.currentState!.setAsset(sound.path);
-                                                                  audioPlayerKey.currentState!.fadeIn(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
-                                                                },
-                                                                icon: const Icon(Icons.north_east, color: Colors.blue),
-                                                              ),
-                                                              const SizedBox(width: 8.0),
-                                                              IconButton(
-                                                                onPressed: () async {
-                                                                  if (sound.path.isEmpty) {
-                                                                    showDialog(
-                                                                        context: context,
-                                                                        builder: (context) => AlertDialog(
-                                                                                title: Text(
-                                                                                  "Error",
-                                                                                  style: textTheme.displayMedium,
-                                                                                ),
-                                                                                content: Text("Sound path is empty", style: textTheme.displaySmall),
-                                                                                actions: [
-                                                                                  TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
-                                                                                ]));
-                                                                    return;
-                                                                  }
-                                                                  await audioPlayerKey.currentState!.setAsset(sound.path);
-                                                                  audioPlayerKey.currentState!.play(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
-                                                                },
-                                                                icon: const Icon(Icons.play_arrow, color: Colors.green),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ));
-                                              },
-                                            ),
+                                                            const SizedBox(width: 8.0),
+                                                            IconButton(
+                                                              onPressed: () async {
+                                                                if (sound.path.isEmpty) {
+                                                                  showDialog(
+                                                                      context: context,
+                                                                      builder: (context) => AlertDialog(
+                                                                              title: Text(
+                                                                                "Error",
+                                                                                style: textTheme.displayMedium,
+                                                                              ),
+                                                                              content: Text("Sound path is empty", style: textTheme.displaySmall),
+                                                                              actions: [
+                                                                                TextButton(onPressed: () => Navigator.of(context).pop(), child: Text("OK", style: textTheme.displaySmall))
+                                                                              ]));
+                                                                  return;
+                                                                }
+                                                                await audioPlayerKey.currentState!.setAsset(sound.path);
+                                                                audioPlayerKey.currentState!.play(sound.startingSeconds ?? 0, sound.startingVolume ?? 1.0);
+                                                              },
+                                                              icon: const Icon(Icons.play_arrow, color: Colors.green),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ));
+                                            },
                                           ),
-                                        ],
-                                      ),
-                                    )
-                                  : Padding(
-                                      key: const ValueKey("addButton"),
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: IconButton(
-                                          onPressed: () {
-                                            adeganListNotifier.addAdegan(Adegan(title: "Adegan ${adeganList.length + 1}", sounds: []));
-                                          },
-                                          icon: Icon(
-                                            Icons.add_rounded,
-                                            color: theme.colorScheme.onBackground,
-                                            size: 48,
-                                          )),
-                                    );
-                            },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              //* Add adegan
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: IconButton(
+                                    onPressed: () {
+                                      adeganListNotifier.addAdegan(Adegan(title: "Adegan ${adeganList.length + 1}", sounds: []));
+                                    },
+                                    icon: Icon(
+                                      Icons.add_rounded,
+                                      color: theme.colorScheme.onBackground,
+                                      size: 48,
+                                    )),
+                              )
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16.0),
@@ -513,66 +538,56 @@ class SoundSettingsDialog extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16.0),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => pickSoundFile(ref),
-                        style: ElevatedButton.styleFrom(
-                          shadowColor: Colors.transparent,
-                          elevation: 0,
-                          surfaceTintColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          backgroundColor: theme.primary,
-                          textStyle: textTheme.displaySmall,
-                          side: BorderSide(color: theme.secondary),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.folder,
-                              color: theme.onBackground,
-                            ),
-                            const SizedBox(width: 8.0),
-                            Text(selectedFilePath ?? sound.path.split("/").last, style: textTheme.displaySmall),
-                          ],
-                        ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: () => pickSoundFile(ref),
+                    style: ElevatedButton.styleFrom(
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      surfaceTintColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
                       ),
+                      backgroundColor: theme.primary,
+                      textStyle: textTheme.displaySmall,
+                      side: BorderSide(color: theme.secondary),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.folder,
+                          color: theme.onBackground,
+                        ),
+                        const SizedBox(width: 8.0),
+                        Text(selectedFilePath ?? sound.path.split("/").last, style: textTheme.displaySmall),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16.0),
+                Text("Starting Time/Volume", style: textTheme.displaySmall),
+                const SizedBox(height: 8.0),
                 //* Starting time
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Column(
-                      children: [
-                        Text("Starting Time", style: textTheme.displaySmall),
-                        const SizedBox(height: 8.0),
-                        StartingTimeSettingsWidget(
-                          onChanged: (value) {
-                            ref.read(startingSecondsProvider.notifier).state = value;
-                          },
-                          initialValue: sound.startingSeconds ?? 0,
-                        ),
-                      ],
+                    StartingTimeSettingsWidget(
+                      onChanged: (value) {
+                        ref.read(startingSecondsProvider.notifier).state = value;
+                      },
+                      initialValue: sound.startingSeconds ?? 0,
                     ),
                     const SizedBox(width: 8.0),
-                    Column(
-                      children: [
-                        Text("Starting Volume", style: textTheme.displaySmall),
-                        const SizedBox(height: 8.0),
-                        StartingVolumeSettingsWidget(
-                          onChanged: (value) {
-                            ref.read(startingVolumeProvider.notifier).state = value;
-                          },
-                          initialValue: sound.startingVolume ?? 1.0,
-                        ),
-                      ],
+                    Expanded(
+                      child: StartingVolumeSettingsWidget(
+                        onChanged: (value) {
+                          ref.read(startingVolumeProvider.notifier).state = value;
+                        },
+                        initialValue: sound.startingVolume ?? 1.0,
+                      ),
                     )
                   ],
                 ),
@@ -853,7 +868,7 @@ class _StartingVolumeSettingsWidgetState extends State<StartingVolumeSettingsWid
       ),
       child: Row(
         children: [
-          Slider(value: value, onChanged: (v) => setState(() => value = v), onChangeEnd: (value) => widget.onChanged(value), min: 0, max: 1, thumbColor: Theme.of(context).colorScheme.onBackground, activeColor: Colors.blue, secondaryActiveColor: Colors.blue, inactiveColor: Theme.of(context).colorScheme.primary),
+          Expanded(child: Slider(value: value, onChanged: (v) => setState(() => value = v), onChangeEnd: (value) => widget.onChanged(value), min: 0, max: 1, thumbColor: Theme.of(context).colorScheme.onBackground, activeColor: Colors.blue, secondaryActiveColor: Colors.blue, inactiveColor: Theme.of(context).colorScheme.primary)),
           const SizedBox(width: 8.0),
           Text("${(value * 100).toStringAsFixed(0)}%", style: Theme.of(context).textTheme.displaySmall),
           const SizedBox(width: 20.0),
