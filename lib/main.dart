@@ -1,6 +1,6 @@
+import 'package:diponegoro_sb/components/home.dart';
 import 'package:diponegoro_sb/constants.dart';
 import 'package:flutter/material.dart';
-import 'routes.dart';
 
 //* Riverpod
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +16,7 @@ class App extends StatelessWidget {
     return MaterialApp(
       title: 'diponegoro.sb',
       theme: darkTheme,
-      routes: Routes(context).routes,
+      home: HomePage(title: "diponegoro.sb"),
     );
   }
 }

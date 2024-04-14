@@ -5,7 +5,6 @@ import 'package:diponegoro_sb/logger.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -162,6 +161,12 @@ final currentEditingAdeganTitleProvider = StateProvider<int?>((ref) {
   return null;
 });
 
+//* Keys for testing
+final loadingKey = UniqueKey();
+final homeKey = UniqueKey();
+final infoButtonKey = UniqueKey();
+final addAdeganButtonKey = UniqueKey();
+
 class HomePage extends ConsumerWidget {
   HomePage({super.key, required this.title});
 
@@ -200,6 +205,7 @@ class HomePage extends ConsumerWidget {
             builder: (context, snapshot) {
               return isInitialized
                   ? Column(
+                      key: homeKey,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
@@ -208,16 +214,18 @@ class HomePage extends ConsumerWidget {
                               height: 48,
                               width: 48,
                               decoration: const BoxDecoration(
+                                borderRadius: BorderRadius.all(Radius.circular(8.0)),
                                 image: DecorationImage(image: AssetImage("assets/d_sb_logo.png"), fit: BoxFit.cover),
                               ),
                             ),
-                            const SizedBox(width: 8.0),
+                            const SizedBox(width: 16.0),
                             Text(
                               "diponegoro.sb",
                               style: textTheme.displayMedium!.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
                             IconButton(
+                                key: infoButtonKey,
                                 onPressed: () {
                                   showDialog(context: context, builder: (context) => const InfoDialog());
                                 },
@@ -333,19 +341,23 @@ class HomePage extends ConsumerWidget {
                                             itemBuilder: (context, index) {
                                               Sound sound = adegan.sounds.isEmpty || index == adegan.sounds.length ? Sound(title: "", path: "") : adegan.sounds[index];
                                               return index == adegan.sounds.length || adegan.sounds.isEmpty
-                                                  ? IconButton(
-                                                      onPressed: () {
-                                                        adeganListNotifier.updateAdegan(
-                                                            adegan.copyWith(sounds: [
-                                                              ...adegan.sounds,
-                                                              Sound(title: "Sound ${index + 1}", path: "")
-                                                            ]),
-                                                            adeganIndex);
-                                                      },
-                                                      icon: Icon(
-                                                        Icons.add,
-                                                        color: theme.colorScheme.onBackground,
-                                                      ))
+                                                  ? Semantics(
+                                                      button: true,
+                                                      label: "Add sound",
+                                                      child: IconButton(
+                                                          onPressed: () {
+                                                            adeganListNotifier.updateAdegan(
+                                                                adegan.copyWith(sounds: [
+                                                                  ...adegan.sounds,
+                                                                  Sound(title: "Sound ${index + 1}", path: "")
+                                                                ]),
+                                                                adeganIndex);
+                                                          },
+                                                          icon: Icon(
+                                                            Icons.add,
+                                                            color: theme.colorScheme.onBackground,
+                                                          )),
+                                                    )
                                                   : Padding(
                                                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                                                       child: ListTile(
@@ -424,6 +436,7 @@ class HomePage extends ConsumerWidget {
                               Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
                                 child: IconButton(
+                                    key: addAdeganButtonKey,
                                     onPressed: () {
                                       adeganListNotifier.addAdegan(Adegan(title: "Adegan ${adeganList.length + 1}", sounds: []));
                                     },
@@ -442,6 +455,7 @@ class HomePage extends ConsumerWidget {
                     )
                   : Center(
                       child: CircularProgressIndicator(
+                        key: loadingKey,
                         color: theme.colorScheme.onBackground,
                       ),
                     );
@@ -463,6 +477,12 @@ final startingSecondsProvider = StateProvider<int?>((ref) {
 final startingVolumeProvider = StateProvider<double?>((ref) {
   return null;
 });
+
+//* Keys for testing
+final titleFieldKey = UniqueKey();
+final pickSoundButtonKey = UniqueKey();
+final saveSoundKey = UniqueKey();
+final discardSoundKey = UniqueKey();
 
 class SoundSettingsDialog extends ConsumerWidget {
   SoundSettingsDialog({super.key, required this.sound, required this.adeganIndex, required this.soundIndex});
@@ -526,6 +546,7 @@ class SoundSettingsDialog extends ConsumerWidget {
                         cursorColor: theme.onBackground,
                         style: textTheme.displaySmall,
                         controller: titleController,
+                        key: titleFieldKey,
                         decoration: InputDecoration(
                           labelText: "Title",
                           labelStyle: textTheme.displaySmall,
@@ -542,6 +563,7 @@ class SoundSettingsDialog extends ConsumerWidget {
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
+                    key: pickSoundButtonKey,
                     onPressed: () => pickSoundFile(ref),
                     style: ElevatedButton.styleFrom(
                       shadowColor: Colors.transparent,
@@ -596,6 +618,7 @@ class SoundSettingsDialog extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: ElevatedButton(
+                        key: saveSoundKey,
                         onPressed: () => saveSoundSettings(ref, Sound(title: titleController.text, path: selectedFilePath ?? sound.path), adeganIndex, soundIndex, context, sound),
                         style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(
@@ -609,6 +632,7 @@ class SoundSettingsDialog extends ConsumerWidget {
                     const SizedBox(width: 8.0),
                     Expanded(
                       child: ElevatedButton(
+                        key: discardSoundKey,
                         onPressed: () => Navigator.of(context).pop(),
                         style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(

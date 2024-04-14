@@ -20,9 +20,16 @@ class InfoDialog extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Built with ❤️ by ", style: textTheme.displaySmall),
+                Text("Made with ❤️ by ", style: textTheme.displaySmall),
                 //* Link
                 MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => launchUrl(Uri(scheme: "https", host: "github.com", path: "Alkali-1234")), child: Text("@Alkali-1234", style: textTheme.displaySmall!.copyWith(color: Colors.blue, decoration: TextDecoration.underline, decorationColor: Colors.blue)))),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("Built with ", style: textTheme.displaySmall),
+                MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => launchUrl(Uri(scheme: "https", host: "flutter.dev")), child: Text("Flutter", style: textTheme.displaySmall!.copyWith(color: Colors.blue, decoration: TextDecoration.underline, decorationColor: Colors.blue)))),
               ],
             ),
             const SizedBox(height: 10),
