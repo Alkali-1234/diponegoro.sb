@@ -203,12 +203,18 @@ class HomePage extends ConsumerWidget {
         LogicalKeySet(LogicalKeyboardKey.space): const TogglePlaybackIntent(),
         LogicalKeySet(LogicalKeyboardKey.keyW): const IncreaseVolumeIntent(),
         LogicalKeySet(LogicalKeyboardKey.keyS): const DecreaseVolumeIntent(),
+        //* Increase/Decrease Volume Large
+        LogicalKeySet(LogicalKeyboardKey.keyM): const IncreaseVolumeLargeIntent(),
+        LogicalKeySet(LogicalKeyboardKey.keyN): const DecreaseVolumeLargeIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
           TogglePlaybackIntent: TogglePlaybackAction(audioPlayerKey),
           IncreaseVolumeIntent: IncreaseVolumeAction(audioPlayerKey),
           DecreaseVolumeIntent: DecreaseVolumeAction(audioPlayerKey),
+          //* Large
+          IncreaseVolumeLargeIntent: IncreaseVolumeLargeAction(audioPlayerKey),
+          DecreaseVolumeLargeIntent: DecreaseVolumeLargeAction(audioPlayerKey),
         },
         child: FocusScope(
           autofocus: true,

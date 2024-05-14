@@ -50,3 +50,35 @@ class DecreaseVolumeAction extends Action<DecreaseVolumeIntent> {
     logger.d("DecreaseVolumeAction invoked");
   }
 }
+
+class IncreaseVolumeLargeIntent extends Intent {
+  const IncreaseVolumeLargeIntent();
+}
+
+class IncreaseVolumeLargeAction extends Action<IncreaseVolumeLargeIntent> {
+  IncreaseVolumeLargeAction(this.playbackKey);
+
+  final GlobalKey<AudioPlayerWidgetState> playbackKey;
+
+  @override
+  void invoke(covariant IncreaseVolumeLargeIntent intent) {
+    playbackKey.currentState?.adjustVolume(0.02);
+    logger.d("IncreaseVolumeLargeAction invoked");
+  }
+}
+
+class DecreaseVolumeLargeIntent extends Intent {
+  const DecreaseVolumeLargeIntent();
+}
+
+class DecreaseVolumeLargeAction extends Action<DecreaseVolumeLargeIntent> {
+  DecreaseVolumeLargeAction(this.playbackKey);
+
+  final GlobalKey<AudioPlayerWidgetState> playbackKey;
+
+  @override
+  void invoke(covariant DecreaseVolumeLargeIntent intent) {
+    playbackKey.currentState?.adjustVolume(-0.02);
+    logger.d("DecreaseVolumeLargeAction invoked");
+  }
+}
