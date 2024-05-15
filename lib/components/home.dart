@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:chat_gpt_flutter/chat_gpt_flutter.dart';
 import 'package:diponegoro_sb/actions.dart';
+import 'package:diponegoro_sb/components/chatgpt.dart';
 import 'package:diponegoro_sb/components/info_dialog.dart';
 import 'package:diponegoro_sb/logger.dart';
+import 'package:diponegoro_sb/secrets.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -245,6 +248,16 @@ class HomePage extends ConsumerWidget {
                                     style: textTheme.displayMedium!.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const Spacer(),
+                                  IconButton(
+                                      onPressed: () => showDialog(
+                                            context: context,
+                                            builder: (context) => Dialog(
+                                                child: ChatCompletionPage(
+                                                    chatGpt: ChatGpt(
+                                              apiKey: apiKey,
+                                            ))),
+                                          ),
+                                      icon: const Icon(Icons.smart_toy, color: Colors.blue)),
                                   IconButton(
                                       key: infoButtonKey,
                                       onPressed: () {
